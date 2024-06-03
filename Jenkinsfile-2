@@ -1,5 +1,41 @@
 pipeline {
-  agent { label 'linux' }
+  agent {
+    kubernetes {
+      yaml '''
+        apiVersion: v1
+        kind: Pod
+        spec:
+          containers:
+            - name: kaniko
+              image: gcr.io/kaniko-project/executor:debug
+              imagePullPolicy: Always
+              command:
+                - sleep
+              args:
+                - 99d
+              volumeMounts:
+                - name: jenkins-docker-cfg
+                  mountPath: /kaniko/.docker
+                - name: image-cache
+                  mountPath: /image-cache
+                - name: m2-cache
+                  mountPath: /root/.m2
+          volumes:
+            - name: image-cache
+              persistentVolumeClaim:
+                claimName: cache-pvc-claim
+            - name: m2-cache
+              persistentVolumeClaim:
+                claimName: maven-m2-cache-pvc-claim
+            - name: jenkins-docker-cfg
+              secret:
+                secretName: aws-ecr-regcred
+                items:
+                - key: .dockerconfigjson
+                  path: config.json
+      '''
+      }
+    }
   options {
     buildDiscarder(logRotator(numToKeepStr: '5'))
   }
